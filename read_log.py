@@ -8,6 +8,9 @@ class KO_User:
 	def __init__(self, login: str, nickname: str) -> None:
 		self.login = login
 		self.nickname = nickname
+	
+	def __repr__(self) -> str:
+		return str(self.login) + ", " + str(self.nickname)
 
 
 class KO_UserResult:
@@ -85,9 +88,9 @@ class KO_LogEntry:
 
 class KO_Instance:
 	def __init__(self) -> None:
-		self.start_time = None
-		self.end_time = None
-		self.host = None
+		self.start_time = None	# type: datetime
+		self.end_time = None	# type: datetime
+		self.host = None	# type: str
 		self.results = []	# type: list[KO_UserResult]
 
 	def add_result(self, player_result: KO_UserResult) -> None:
@@ -106,24 +109,34 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 			if entry.valid:
 				user_lookup.add_user(entry.user)
 
-				if entry.user.login != server_login and '/ko start' in entry.message:
+				if entry.user.login != server_login and ('/ko start' in entry.message or '/kostart' in entry.message):
 					new_instance = KO_Instance()
 					new_instance.host = entry.user
 					new_instance.start_time = entry.timestamp
 				elif new_instance:
-					if entry.user.login == server_login and 'has been KO for ' in entry.message:
-						server_header_len = 0
-						if entry.message.startswith('Server〉'):
-							server_header_len = len('Server〉')
-						elif entry.message.startswith('Server 〉'):
-							server_header_len = len('Server 〉')
-						if server_header_len == 0:
-							logger.info(f"New type of KO message: {entry.message}")
 
-						has_been_ko_index = entry.message.index('has been KO for ', server_header_len)
-						result_nickname = entry.message[server_header_len:has_been_ko_index-1]
-						result_login = user_lookup.get_login(result_nickname)
-						result_reason_raw = entry.message[has_been_ko_index+16:]
+					if entry.user.login == server_login and ('has been KO for ' in entry.message or ' is KO ' in entry.message):
+						result_nickname = ''
+						result_login = ''
+						result_reason_raw = ''
+						if entry.message.startswith('>> '):
+							result_nickname = entry.message[3:entry.message.index(' is KO ')]
+							result_login = user_lookup.get_login(result_nickname)
+							has_been_ko_index = entry.message.index(' is KO ', 3)
+							result_reason_raw = entry.message[has_been_ko_index+7:]
+						else:
+							server_header_len = 0
+							if entry.message.startswith('Server〉'):
+								server_header_len = len('Server〉')
+							elif entry.message.startswith('Server 〉'):
+								server_header_len = len('Server 〉')
+							if server_header_len == 0:
+								logger.info(f"New type of KO message: {entry.message}")
+							has_been_ko_index = entry.message.index('has been KO for ', server_header_len)
+							result_nickname = entry.message[server_header_len:has_been_ko_index-1]
+							result_login = user_lookup.get_login(result_nickname)
+							result_reason_raw = entry.message[has_been_ko_index+16:]
+
 						if 'DNF' in result_reason_raw:
 							result_reason = 'DNF'
 						elif 'Worst place finish':
@@ -132,17 +145,24 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 							logger.error(f"Unknown result reason for {entry.message}")
 							result_reason = 'Unknown'
 						new_instance.add_result(KO_UserResult(KO_User(result_login, result_nickname), entry.timestamp, result_reason))
-					elif entry.user.login == server_login and 'The KnockOut Champ is ' in entry.message:
-						server_header_len = 0
-						if entry.message.startswith('Server〉'):
-							server_header_len = len('Server〉')
-						elif entry.message.startswith('Server 〉'):
-							server_header_len = len('Server 〉')
-						if server_header_len == 0:
-							logger.info(f"New type of KO message: {entry.message}")
 
-						champ_nickname = entry.message[server_header_len + 22:]
-						champ_login = user_lookup.get_login(champ_nickname)
+					elif entry.user.login == server_login and ('The KnockOut Champ is ' in entry.message or 'KnockOut has ended! ' in entry.message):
+						champ_nickname = ''
+						champ_login = ''
+						if entry.message.startswith('>> '):
+							champ_nickname = entry.message[23:entry.message.index(' is the Champ!')]
+							champ_login = user_lookup.get_login(champ_nickname)
+						else:
+							server_header_len = 0
+							if entry.message.startswith('Server〉'):
+								server_header_len = len('Server〉')
+							elif entry.message.startswith('Server 〉'):
+								server_header_len = len('Server 〉')
+							if server_header_len == 0:
+								logger.info(f"New type of KO message: {entry.message}")
+							champ_nickname = entry.message[server_header_len + 22:]
+							champ_login = user_lookup.get_login(champ_nickname)
+
 						new_instance.add_result(KO_UserResult(KO_User(champ_login, champ_nickname), entry.timestamp, 'CHAMP'))
 						new_instance.end_time = entry.timestamp
 						kos.append(new_instance)
@@ -156,9 +176,24 @@ if __name__ == '__main__':
 	kos = []	# type: list[KO_Instance]
 
 	read_ko_logfile('.\\data\\TM2_knock_out_login_-2013-07-04_to_2014-05-24\\GameLog.knock_out.txt', 'knock_out', kos, user_lookup)
-	read_ko_logfile('.\\data\\TM2_mx_knockout_login_-2011-11-03_to_2017-05-28\\GameLog.mx_knockout.txt', 'mx_knockout', kos, user_lookup)
+	#read_ko_logfile('.\\data\\TM2_mx_knockout_login_-2011-11-03_to_2017-05-28\\GameLog.mx_knockout.txt', 'mx_knockout', kos, user_lookup)
+	kos = sorted(kos, key=lambda x: x.start_time)
+
+	logger.info("Writing kos.txt")
+	with open('kos.txt', 'w', encoding='utf-8') as kos_file:
+		for ko in kos:
+			kos_file.write("KO Started: " + ko.start_time.strftime("%c") + "\n")
+			kos_file.write("Host: " + str(ko.host) + "\n")
+			kos_file.write("Length: " + str(ko.end_time - ko.start_time) + "\n")
+			kos_file.write(str(len(ko.results)) + " Player(s):\n")
+			for player in ko.results[::-1]:
+				kos_file.write("\t" + str(player.ko_reason) + "\t\t" + str(player.user) + "\n")
+			kos_file.write("\n")
 
 	logger.info("Writing user_list.txt")
 	with open('user_list.txt', 'w', encoding='utf-8') as user_list_file:
 		for login, nicknames in user_lookup.users.items():
 			user_list_file.write(login + ": " + ', '.join(nicknames) + '\n')
+
+
+	# Load MatchSettings Success
