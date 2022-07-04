@@ -45,11 +45,11 @@ class KO_LogEntry:
 	parsing_errors = []
 
 	def __init__(self, raw_entry: str) -> None:
-		self.timestamp = None
-		self.entry_kind = None
-		self.user = None
-		self.message = None
-		self.valid = False
+		self.timestamp = None	# type: datetime
+		self.entry_kind = None	# type: str
+		self.user = None	# type: KO_User
+		self.message = None	# type: str
+		self.valid = False	# type: bool
 		try:
 			self.valid = self._parse_raw_entry(raw_entry)
 		except:
@@ -81,7 +81,7 @@ class KO_LogEntry:
 			user_end_index = line.index(')]', message_start_index) + 1
 			self.message = line[user_end_index+1:].strip()
 			user_login_end_index = line.index(' (', message_start_index+2)
-			self.user = KO_User(line[message_start_index+1:user_login_end_index], line[user_login_end_index+2:user_end_index-1])
+			self.user = KO_User(line[message_start_index+1:user_login_end_index], line[user_login_end_index+2:user_end_index-1].strip())
 			return True
 		return False
 
@@ -94,6 +94,10 @@ class KO_Instance:
 		self.results = []	# type: list[KO_UserResult]
 
 	def add_result(self, player_result: KO_UserResult) -> None:
+		for index in range(0, len(self.results)):
+			if self.results[index].user.login == player_result.user.login:
+				self.results.pop(index)
+				break
 		self.results.append(player_result)
 
 
@@ -120,7 +124,7 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 						result_login = ''
 						result_reason_raw = ''
 						if entry.message.startswith('>> '):
-							result_nickname = entry.message[3:entry.message.index(' is KO ')]
+							result_nickname = entry.message[3:entry.message.index(' is KO ')].strip()
 							result_login = user_lookup.get_login(result_nickname)
 							has_been_ko_index = entry.message.index(' is KO ', 3)
 							result_reason_raw = entry.message[has_been_ko_index+7:]
@@ -133,7 +137,7 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 							if server_header_len == 0:
 								logger.info(f"New type of KO message: {entry.message}")
 							has_been_ko_index = entry.message.index('has been KO for ', server_header_len)
-							result_nickname = entry.message[server_header_len:has_been_ko_index-1]
+							result_nickname = entry.message[server_header_len:has_been_ko_index-1].strip()
 							result_login = user_lookup.get_login(result_nickname)
 							result_reason_raw = entry.message[has_been_ko_index+16:]
 
@@ -150,7 +154,7 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 						champ_nickname = ''
 						champ_login = ''
 						if entry.message.startswith('>> '):
-							champ_nickname = entry.message[23:entry.message.index(' is the Champ!')]
+							champ_nickname = entry.message[entry.message.index('KnockOut has ended! ')+20:entry.message.index(' is the Champ!')].strip()
 							champ_login = user_lookup.get_login(champ_nickname)
 						else:
 							server_header_len = 0
@@ -160,7 +164,7 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 								server_header_len = len('Server 〉')
 							if server_header_len == 0:
 								logger.info(f"New type of KO message: {entry.message}")
-							champ_nickname = entry.message[server_header_len + 22:]
+							champ_nickname = entry.message[server_header_len + 22:].strip()
 							champ_login = user_lookup.get_login(champ_nickname)
 
 						new_instance.add_result(KO_UserResult(KO_User(champ_login, champ_nickname), entry.timestamp, 'CHAMP'))
@@ -176,7 +180,7 @@ if __name__ == '__main__':
 	kos = []	# type: list[KO_Instance]
 
 	read_ko_logfile('.\\data\\TM2_knock_out_login_-2013-07-04_to_2014-05-24\\GameLog.knock_out.txt', 'knock_out', kos, user_lookup)
-	#read_ko_logfile('.\\data\\TM2_mx_knockout_login_-2011-11-03_to_2017-05-28\\GameLog.mx_knockout.txt', 'mx_knockout', kos, user_lookup)
+	read_ko_logfile('.\\data\\TM2_mx_knockout_login_-2011-11-03_to_2017-05-28\\GameLog.mx_knockout.txt', 'mx_knockout', kos, user_lookup)
 	kos = sorted(kos, key=lambda x: x.start_time)
 
 	logger.info("Writing kos.txt")
