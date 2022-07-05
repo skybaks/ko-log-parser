@@ -226,6 +226,3 @@ if __name__ == '__main__':
 	with open('user_list.txt', 'w', encoding='utf-8') as user_list_file:
 		for login, nicknames in user_lookup.users.items():
 			user_list_file.write(login + ": " + ', '.join(nicknames) + '\n')
-
-
-	# Load MatchSettings Success
