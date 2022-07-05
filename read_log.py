@@ -92,6 +92,7 @@ class KO_Instance:
 		self.end_time = None	# type: datetime
 		self.host = None	# type: str
 		self.results = []	# type: list[KO_UserResult]
+		self.maps = []	# type: list[str]
 
 	def add_result(self, player_result: KO_UserResult) -> None:
 		for index in range(0, len(self.results)):
@@ -99,6 +100,10 @@ class KO_Instance:
 				self.results.pop(index)
 				break
 		self.results.append(player_result)
+
+	def add_map(self, map_name: str) -> None:
+		if map_name not in self.maps:
+			self.maps.append(map_name)
 
 
 def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', user_lookup: KO_UserLookup) -> None:
@@ -171,6 +176,26 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 						new_instance.end_time = entry.timestamp
 						kos.append(new_instance)
 						new_instance = None
+			elif new_instance and ('Loading map' in line or 'Loading challenge' in line):
+				line_lower = line.lower()
+				loading_map_str = ''
+				if 'loading map' in line_lower:
+					loading_map_str = 'loading map '
+				elif 'loading challenge' in line_lower:
+					loading_map_str = 'loading challenge '
+				else:
+					logger.error("Unexpected loading map string for: " + line)
+				loading_map_start =line_lower.index(loading_map_str)
+
+				mapfile_extn = ''
+				if '.map.gbx' in line_lower:
+					mapfile_extn = '.map.gbx'
+				elif '.challenge.gbx' in line_lower:
+					mapfile_extn = '.challenge.gbx'
+				else:
+					logger.error("Unexpected map file name for: " + line)
+				map_gbx_start = line_lower.index(mapfile_extn)
+				new_instance.add_map(line[loading_map_start+len(loading_map_str):map_gbx_start+len(mapfile_extn)])
 
 
 if __name__ == '__main__':
@@ -189,6 +214,9 @@ if __name__ == '__main__':
 			kos_file.write("KO Started: " + ko.start_time.strftime("%c") + "\n")
 			kos_file.write("Host: " + str(ko.host) + "\n")
 			kos_file.write("Length: " + str(ko.end_time - ko.start_time) + "\n")
+			kos_file.write(str(len(ko.maps)) + " Map(s):\n")
+			for map in ko.maps:
+				kos_file.write("\t" + str(map) + "\n")
 			kos_file.write(str(len(ko.results)) + " Player(s):\n")
 			for player in ko.results[::-1]:
 				kos_file.write("\t" + str(player.ko_reason) + "\t\t" + str(player.user) + "\n")
