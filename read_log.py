@@ -208,6 +208,8 @@ if __name__ == '__main__':
 	read_ko_logfile('.\\data\\TM2_mx_knockout_login_-2011-11-03_to_2017-05-28\\GameLog.mx_knockout.txt', 'mx_knockout', kos, user_lookup)
 	kos = sorted(kos, key=lambda x: x.start_time)
 
+	logger.info(f"Found {str(len(kos))} KOs and {str(len(user_lookup.users.keys()))} Users")
+
 	logger.info("Writing kos.txt")
 	with open('kos.txt', 'w', encoding='utf-8') as kos_file:
 		for ko in kos:
