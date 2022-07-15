@@ -139,20 +139,29 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 								server_header_len = len('Server〉')
 							elif entry.message.startswith('Server 〉'):
 								server_header_len = len('Server 〉')
+							elif entry.message.startswith('$n$fffServer$m$ff0〉'):
+								server_header_len = len('$n$fffServer$m$ff0〉')
+							elif entry.message.startswith('$n$fffKO$m$ff0 〉$fff$ff0'):
+								server_header_len = len('$n$fffKO$m$ff0 〉$fff$ff0')
+							elif entry.message.startswith('$n$fffKO$m$ff0 〉$fff'):
+								server_header_len = len('$n$fffKO$m$ff0 〉$fff')
 							if server_header_len == 0:
-								logger.info(f"New type of KO message: {entry.message}")
-							has_been_ko_index = entry.message.index('has been KO for ', server_header_len)
-							result_nickname = entry.message[server_header_len:has_been_ko_index-1].strip()
+								logger.error(f"New type of KO message: {entry.message}")
+							has_been_ko_index = 0
+							if 'has been KO for ' in entry.message:
+								has_been_ko_index = entry.message.index('has been KO for ', server_header_len)
+							elif 'is KO ' in entry.message:
+								has_been_ko_index = entry.message.index('is KO ', server_header_len)
+							else:
+								logger.error(f"New type of KO message: {entry.message}")
+							result_nickname = entry.message[server_header_len:has_been_ko_index-1].strip().replace('$z$aaa$s', '').replace('$z$f00$s', '').replace('$z$s$fff', '')
 							result_login = user_lookup.get_login(result_nickname)
 							result_reason_raw = entry.message[has_been_ko_index+16:]
 
-						if 'DNF' in result_reason_raw:
+						if 'DN' in result_reason_raw:
 							result_reason = 'DNF'
-						elif 'Worst place finish':
-							result_reason = 'WPF'
 						else:
-							logger.error(f"Unknown result reason for {entry.message}")
-							result_reason = 'Unknown'
+							result_reason = 'WPF'
 						new_instance.add_result(KO_UserResult(KO_User(result_login, result_nickname), entry.timestamp, result_reason))
 
 					elif entry.user.login == server_login and ('The KnockOut Champ is ' in entry.message or 'KnockOut has ended! ' in entry.message):
@@ -167,6 +176,12 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 								server_header_len = len('Server〉')
 							elif entry.message.startswith('Server 〉'):
 								server_header_len = len('Server 〉')
+							elif entry.message.startswith('$n$fffServer$m$ff0〉$o'):
+								server_header_len = len('$n$fffServer$m$ff0〉$o')
+							elif entry.message.startswith('$n$fffKO$m$ff0 〉$fff$ff0'):
+								server_header_len = len('$n$fffKO$m$ff0 〉$fff$ff0')
+							elif entry.message.startswith('$n$fffKO$m$ff0 〉$fff'):
+								server_header_len = len('$n$fffKO$m$ff0 〉$fff')
 							if server_header_len == 0:
 								logger.info(f"New type of KO message: {entry.message}")
 							champ_nickname = entry.message[server_header_len + 22:].strip()
@@ -192,6 +207,8 @@ def read_ko_logfile(filepath: str, server_login: str, kos: 'list[KO_Instance]', 
 					mapfile_extn = '.map.gbx'
 				elif '.challenge.gbx' in line_lower:
 					mapfile_extn = '.challenge.gbx'
+				elif '.gbx' in line_lower:
+					mapfile_extn = '.gbx'
 				else:
 					logger.error("Unexpected map file name for: " + line)
 				map_gbx_start = line_lower.index(mapfile_extn)
@@ -204,8 +221,13 @@ if __name__ == '__main__':
 	user_lookup = KO_UserLookup()
 	kos = []	# type: list[KO_Instance]
 
-	read_ko_logfile('.\\data\\TM2_knock_out_login_-2013-07-04_to_2014-05-24\\GameLog.knock_out.txt', 'knock_out', kos, user_lookup)
-	read_ko_logfile('.\\data\\TM2_mx_knockout_login_-2011-11-03_to_2017-05-28\\GameLog.mx_knockout.txt', 'mx_knockout', kos, user_lookup)
+	# 2011-2017
+	# Old stuff
+	#read_ko_logfile('.\\data\\TM2_knock_out_login_-2013-07-04_to_2014-05-24\\GameLog.knock_out.txt', 'knock_out', kos, user_lookup)
+	#read_ko_logfile('.\\data\\TM2_mx_knockout_login_-2011-11-03_to_2017-05-28\\GameLog.mx_knockout.txt', 'mx_knockout', kos, user_lookup)
+
+	read_ko_logfile(r"data\TM2020_Logs\GameLog.tmx_knockout.txt", 'I6tC38bZSgqc0hS1oEUAGQ', kos, user_lookup)
+
 	kos = sorted(kos, key=lambda x: x.start_time)
 
 	logger.info(f"Found {str(len(kos))} KOs and {str(len(user_lookup.users.keys()))} Users")
